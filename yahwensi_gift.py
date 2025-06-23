@@ -114,7 +114,7 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_data and user_data[2] is not None and user_data[1] is not None and user_data[2] != "":
         if user_data[2] != "" and user_data[1] != "":
             await query.edit_message_text(
-                f"👋 Welcome back {user_data[0]}!\n You are giving your gift to:  *{user_data[1]}*\n\n(Shhh, keep it secret!)",
+                f"👋 Welcome back {user_data[0]}!\nYou're assigned to: *{user_data[1]}*\n(Shhh, keep it secret!)",
                 parse_mode="Markdown"
             )
             return
@@ -141,12 +141,26 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not assigned:
             await query.edit_message_text("⚠️ Sorry, all names have been assigned or only your own name is left.")
             return
-        keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="start_process")]]
+        retry_keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="retry")]]
         await query.edit_message_text(
             f"🎉 Oooh you are *{chosen_name}*? How you doing?\n🎁 You are giving your gift to: *{assigned}*\n🤫 (Shhh... Keep it secret!)",
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            reply_markup=InlineKeyboardMarkup(retry_keyboard)
         )
+
+async def handle_retry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
+    await query.answer()
+
+    user_data = get_user(user_id)
+    if user_data:
+        _, _, attempts = user_data
+        if attempts >= 2:
+            await query.edit_message_text("❌ You already retried once. You cannot retry again.")
+            return
+        increment_attempt(user_id)
+        await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
 
 # Admin-only: View DB and clear
 async def debug_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -194,6 +208,7 @@ def main():
     app.add_handler(CommandHandler("debug_clear", debug_clear))
     app.add_handler(CommandHandler("debug_delete", debug_delete))
     app.add_handler(CallbackQueryHandler(start_process, pattern="start_process"))
+    app.add_handler(CallbackQueryHandler(handle_retry, pattern="retry"))
     app.add_handler(CallbackQueryHandler(handle_choice, pattern="^choose_"))
 
     print("✅ Bot is running...")
