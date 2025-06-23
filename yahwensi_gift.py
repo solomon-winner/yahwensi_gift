@@ -114,7 +114,7 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_data and user_data[2] is not None and user_data[1] is not None and user_data[2] != "":
         if user_data[2] != "" and user_data[1] != "":
             await query.edit_message_text(
-                f"👋 Welcome back {user_data[0]}!\n You are giving your gift to:  *{user_data[1]}*\n(Shhh, keep it secret!)",
+                f"👋 Welcome back {user_data[0]}!\n You are giving your gift to:  *{user_data[1]}*\n\n(Shhh, keep it secret!)",
                 parse_mode="Markdown"
             )
             return
