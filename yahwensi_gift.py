@@ -131,11 +131,21 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_data:
         _, assigned_name, attempts = user_data
-        if attempts > 2:
+        if attempts >= 2:
             await query.edit_message_text("❌ You have already tried twice. You cannot change again.")
             return
+        reset_user(user_id)
+        assigned = assign_name(user_id, chosen_name)
+        if not assigned:
+            await query.edit_message_text("⚠️ Sorry, all names have been assigned or only your own name is left.")
+            return
         increment_attempt(user_id)
-        await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
+        retry_keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="retry")]]
+        await query.edit_message_text(
+            f"🎉 Oooh you are *{chosen_name}*? How you doing?\n🎁 You are giving your gift to: *{assigned}*\n🤫 (Shhh... Keep it secret!)",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(retry_keyboard)
+        )
     else:
         assigned = assign_name(user_id, chosen_name)
         if not assigned:
@@ -159,13 +169,11 @@ async def handle_retry(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if attempts >= 2:
             await query.edit_message_text("❌ You already retried once. You cannot retry again.")
             return
-        increment_attempt(user_id)
         await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
 
 # Admin-only: View DB and clear
 async def debug_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.username != ADMIN_USERNAME:
-        print("❗ Unauthorized access attempt by:", update.effective_user.username)
         return
     data = show_all_assignments()
     if not data:
