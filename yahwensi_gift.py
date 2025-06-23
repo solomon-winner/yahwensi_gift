@@ -28,6 +28,9 @@ name_list = [
     "mntie", "frie", "aster ayana", "aster bekalu", "sami", "feven", "bemni", "elshu"
 ]
 
+# Admin username
+ADMIN_USERNAME = "sol_african"
+
 # Utilities
 def get_user(user_id):
     cursor.execute("SELECT chosen_name, assigned_name, attempts FROM users WHERE user_id = ?", (user_id,))
@@ -73,11 +76,19 @@ def clear_all():
     cursor.execute("DELETE FROM assigned_names")
     conn.commit()
 
+def delete_by_name(name):
+    cursor.execute("SELECT user_id FROM users WHERE chosen_name = ?", (name,))
+    user = cursor.fetchone()
+    if user:
+        user_id = user[0]
+        return reset_user(user_id)
+    return False
+
 # Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Start", callback_data="start_process")]]
     await update.message.reply_text(
-        "Welcome ያህዌንሲ!\n\nThis bot will help you secretly assign someone to give a gift to.\nClick start and pick your name. You'll then be shown *only one* name to give your gift to — and only you will know. 🤫\n\nYou can retry once if you mistakenly select the wrong name.",
+        "Welcome ያህዌንሲ!\n\n - This bot will help you secretly assign someone to give a gift to.\n - Click start and pick your name. You'll then be shown *only one* name to give your gift to — and only you will know. 🤫\n\n - You can retry once if you mistakenly select the wrong name.",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -88,12 +99,13 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_data = get_user(user_id)
-    if user_data:
-        await query.edit_message_text(
-            f"👋 Welcome back {user_data[0]}!\nYou're assigned to: *{user_data[1]}*\n(Shhh, keep it secret!)",
-            parse_mode="Markdown"
-        )
-        return
+    if user_data and user_data[2] is not None and user_data[1] is not None and user_data[2] != "":
+        if user_data[2] != "" and user_data[1] != "":
+            await query.edit_message_text(
+                f"👋 Welcome back {user_data[0]}!\nYou're assigned to: *{user_data[1]}*\n(Shhh, keep it secret!)",
+                parse_mode="Markdown"
+            )
+            return
 
     # Two-column layout
     keyboard = []
@@ -122,10 +134,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ You have already tried twice. You cannot change again.")
             return
         increment_attempt(user_id)
-        await query.edit_message_text(
-            f"😯 Oh, you are *{chosen_name}*? How are you doing?\nYou were already assigned to: *{assigned_name}*\n(Still secret!)",
-            parse_mode="Markdown"
-        )
+        await start_process(update, context)  # retry by showing the list again
     else:
         assigned = assign_name(user_id, chosen_name)
         if not assigned:
@@ -140,6 +149,8 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Admin-only: View DB and clear
 async def debug_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.username != ADMIN_USERNAME:
+        return
     data = show_all_assignments()
     if not data:
         await update.message.reply_text("📦 No assignments yet.")
@@ -150,8 +161,24 @@ async def debug_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg)
 
 async def debug_clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.username != ADMIN_USERNAME:
+        return
     clear_all()
     await update.message.reply_text("🗑 All assignments cleared.")
+
+async def debug_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.username != ADMIN_USERNAME:
+        return
+    args = context.args
+    if not args:
+        await update.message.reply_text("❗ Please provide a name to delete. Usage: /debug_delete <name>")
+        return
+    name = " ".join(args).strip().lower()
+    success = delete_by_name(name)
+    if success:
+        await update.message.reply_text(f"✅ Deleted assignment for: {name}")
+    else:
+        await update.message.reply_text(f"❌ No assignment found for: {name}")
 
 # Run Bot
 def main():
@@ -164,6 +191,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("debug_show", debug_show))
     app.add_handler(CommandHandler("debug_clear", debug_clear))
+    app.add_handler(CommandHandler("debug_delete", debug_delete))
     app.add_handler(CallbackQueryHandler(start_process, pattern="start_process"))
     app.add_handler(CallbackQueryHandler(handle_choice, pattern="^choose_"))
 
