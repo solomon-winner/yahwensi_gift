@@ -131,7 +131,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_data:
         _, assigned_name, attempts = user_data
-        if attempts >= 2:
+        if attempts > 2:
             await query.edit_message_text("❌ You have already tried twice. You cannot change again.")
             return
         increment_attempt(user_id)
