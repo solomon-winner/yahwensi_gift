@@ -1,1 +1,1 @@
-start: python word_bot.py
+start: python yahwensi_gift.py
