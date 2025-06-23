@@ -29,7 +29,7 @@ name_list = [
 ]
 
 # Admin username
-ADMIN_USERNAME = "sol_african"
+ADMIN_USERNAME = "Sol_african"
 
 # Utilities
 def get_user(user_id):
