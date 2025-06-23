@@ -53,10 +53,34 @@ def increment_attempt(user_id):
     cursor.execute("UPDATE users SET attempts = attempts + 1 WHERE user_id = ?", (user_id,))
     conn.commit()
 
+def reset_user(user_id):
+    cursor.execute("SELECT assigned_name FROM users WHERE user_id = ?", (user_id,))
+    result = cursor.fetchone()
+    if result:
+        assigned_name = result[0]
+        cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM assigned_names WHERE name = ?", (assigned_name,))
+        conn.commit()
+        return True
+    return False
+
+def show_all_assignments():
+    cursor.execute("SELECT * FROM users")
+    return cursor.fetchall()
+
+def clear_all():
+    cursor.execute("DELETE FROM users")
+    cursor.execute("DELETE FROM assigned_names")
+    conn.commit()
+
 # Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Start", callback_data="start_process")]]
-    await update.message.reply_text("Welcome ያህዌንሲ", reply_markup=InlineKeyboardMarkup(keyboard))
+    await update.message.reply_text(
+        "Welcome ያህዌንሲ!\n\nThis bot will help you secretly assign someone to give a gift to.\nClick start and pick your name. You'll then be shown *only one* name to give your gift to — and only you will know. 🤫\n\nYou can retry once if you mistakenly select the wrong name.",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
 
 async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -114,6 +138,21 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
+# Admin-only: View DB and clear
+async def debug_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    data = show_all_assignments()
+    if not data:
+        await update.message.reply_text("📦 No assignments yet.")
+        return
+    msg = "📋 All Assignments:\n\n"
+    for user_id, name, assigned, attempts in data:
+        msg += f"👤 {name} → 🎁 {assigned} (tries: {attempts})\n"
+    await update.message.reply_text(msg)
+
+async def debug_clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    clear_all()
+    await update.message.reply_text("🗑 All assignments cleared.")
+
 # Run Bot
 def main():
     token = os.environ.get("BOT_TOKEN")
@@ -123,6 +162,8 @@ def main():
 
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("debug_show", debug_show))
+    app.add_handler(CommandHandler("debug_clear", debug_clear))
     app.add_handler(CallbackQueryHandler(start_process, pattern="start_process"))
     app.add_handler(CallbackQueryHandler(handle_choice, pattern="^choose_"))
 
