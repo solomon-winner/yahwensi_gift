@@ -165,6 +165,7 @@ async def handle_retry(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Admin-only: View DB and clear
 async def debug_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.username != ADMIN_USERNAME:
+        print("❗ Unauthorized access attempt by:", update.effective_user.username)
         return
     data = show_all_assignments()
     if not data:
