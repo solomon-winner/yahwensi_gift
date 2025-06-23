@@ -66,14 +66,22 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data = get_user(user_id)
     if user_data:
         await query.edit_message_text(
-            f"👋 Welcome back {user_data[0]}!\nYou're assigned to: {user_data[1]}\n(Shhh, keep it secret!)"
+            f"👋 Welcome back {user_data[0]}!\nYou're assigned to: *{user_data[1]}*\n(Shhh, keep it secret!)",
+            parse_mode="Markdown"
         )
         return
 
-    keyboard = [
-        [InlineKeyboardButton(name, callback_data=f"choose_{name}")]
-        for name in name_list
-    ]
+    # Two-column layout
+    keyboard = []
+    row = []
+    for idx, name in enumerate(name_list):
+        row.append(InlineKeyboardButton(name, callback_data=f"choose_{name}"))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+
     await query.edit_message_text("Click your name from the list:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -91,7 +99,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         increment_attempt(user_id)
         await query.edit_message_text(
-            f"😯 Oh, you are {chosen_name}? How are you doing?\nYou were already assigned to: *{assigned_name}*\n(Still secret!)",
+            f"😯 Oh, you are *{chosen_name}*? How are you doing?\nYou were already assigned to: *{assigned_name}*\n(Still secret!)",
             parse_mode="Markdown"
         )
     else:
@@ -99,9 +107,11 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not assigned:
             await query.edit_message_text("⚠️ Sorry, all names have been assigned or only your own name is left.")
             return
+        keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="start_process")]]
         await query.edit_message_text(
             f"🎉 Oooh you are *{chosen_name}*? How you doing?\n🎁 You are giving your gift to: *{assigned}*\n🤫 (Shhh... Keep it secret!)",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
 # Run Bot
