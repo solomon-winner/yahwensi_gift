@@ -84,11 +84,23 @@ def delete_by_name(name):
         return reset_user(user_id)
     return False
 
+def get_name_buttons():
+    keyboard = []
+    row = []
+    for idx, name in enumerate(name_list):
+        row.append(InlineKeyboardButton(name, callback_data=f"choose_{name}"))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    return InlineKeyboardMarkup(keyboard)
+
 # Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Start", callback_data="start_process")]]
     await update.message.reply_text(
-        "Welcome ያህዌንሲ!\n\n - This bot will help you secretly assign someone to give a gift to.\n - Click start and pick your name. You'll then be shown *only one* name to give your gift to — and only you will know. 🤫\n\n - You can retry once if you mistakenly select the wrong name.",
+        "Welcome ያህዌንሲ!\n\nThis bot will help you secretly assign someone to give a gift to.\nClick start and pick your name. You'll then be shown *only one* name to give your gift to — and only you will know. 🤫\n\nYou can retry once if you mistakenly select the wrong name.",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -107,18 +119,7 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-    # Two-column layout
-    keyboard = []
-    row = []
-    for idx, name in enumerate(name_list):
-        row.append(InlineKeyboardButton(name, callback_data=f"choose_{name}"))
-        if len(row) == 2:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
-
-    await query.edit_message_text("Click your name from the list:", reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
 
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -134,7 +135,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ You have already tried twice. You cannot change again.")
             return
         increment_attempt(user_id)
-        await start_process(update, context)  # retry by showing the list again
+        await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
     else:
         assigned = assign_name(user_id, chosen_name)
         if not assigned:
