@@ -36,36 +36,28 @@ def get_user(user_id):
     cursor.execute("SELECT chosen_name, assigned_name, attempts FROM users WHERE user_id = ?", (user_id,))
     return cursor.fetchone()
 
-def get_unassigned_names(exclude_name=None):
-    cursor.execute("SELECT name FROM assigned_names")
-    taken = [row[0] for row in cursor.fetchall()]
-    return [name for name in name_list if name not in taken and name != exclude_name]
+def get_all_users():
+    cursor.execute("SELECT user_id, chosen_name FROM users")
+    return cursor.fetchall()
 
 def assign_name(user_id, chosen_name):
-    available = get_unassigned_names(exclude_name=chosen_name)
-    if not available:
-        return None
-    assigned = random.choice(available)
-    cursor.execute("INSERT INTO assigned_names (name) VALUES (?)", (assigned,))
-    cursor.execute("INSERT INTO users (user_id, chosen_name, assigned_name, attempts) VALUES (?, ?, ?, 1)",
-                   (user_id, chosen_name, assigned))
-    conn.commit()
-    return assigned
-
-def increment_attempt(user_id):
-    cursor.execute("UPDATE users SET attempts = attempts + 1 WHERE user_id = ?", (user_id,))
+    cursor.execute("INSERT OR REPLACE INTO users (user_id, chosen_name) VALUES (?, ?)", (user_id, chosen_name))
     conn.commit()
 
-def reset_user(user_id):
-    cursor.execute("SELECT assigned_name FROM users WHERE user_id = ?", (user_id,))
-    result = cursor.fetchone()
-    if result:
-        assigned_name = result[0]
-        cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
-        cursor.execute("DELETE FROM assigned_names WHERE name = ?", (assigned_name,))
-        conn.commit()
-        return True
-    return False
+
+def finalize_assignments():
+    users = get_all_users()
+    if len(users) < 2:
+        return False, "🚫 Not enough participants to finalize."
+
+    random.shuffle(users)
+    for i in range(len(users)):
+        giver_id, giver_name = users[i]
+        _, receiver_name = users[(i + 1) % len(users)]
+        cursor.execute("UPDATE users SET assigned_name = ? WHERE user_id = ?", (receiver_name, giver_id))
+        cursor.execute("INSERT OR IGNORE INTO assigned_names (name) VALUES (?)", (receiver_name,))
+    conn.commit()
+    return True, "✅ Final assignments completed."
 
 def show_all_assignments():
     cursor.execute("SELECT * FROM users")
@@ -81,7 +73,10 @@ def delete_by_name(name):
     user = cursor.fetchone()
     if user:
         user_id = user[0]
-        return reset_user(user_id)
+        cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+        cursor.execute("DELETE FROM assigned_names WHERE name = ?", (name,))
+        conn.commit()
+        return True
     return False
 
 def get_name_buttons():
@@ -100,7 +95,7 @@ def get_name_buttons():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Start", callback_data="start_process")]]
     await update.message.reply_text(
-        "Welcome ያህዌንሲ!\n\nThis bot will help you secretly assign someone to give a gift to.\nClick start and pick your name. You'll then be shown *only one* name to give your gift to — and only you will know. 🤫\n\nYou can retry once if you mistakenly select the wrong name.",
+        "Welcome ያህዌንሲ!\n\nThis bot will help you secretly assign someone to give a gift to.\nClick start and pick your name. After the admin finalizes, you'll see who you give a gift to. 🤫\n\nYou can retry once if you mistakenly select the wrong name.",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
@@ -111,15 +106,16 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_data = get_user(user_id)
-    if user_data and user_data[2] is not None and user_data[1] is not None and user_data[2] != "":
-        if user_data[2] != "" and user_data[1] != "":
+    if user_data and user_data[1]:
+        if user_data[2]:
             await query.edit_message_text(
-                f"👋 Welcome back {user_data[0]}!\nYou're assigned to: *{user_data[1]}*\n(Shhh, keep it secret!)",
+                f"🎁 You are giving your gift to: *{user_data[2]}*\n🤫 (Shhh... keep it secret!)",
                 parse_mode="Markdown"
             )
-            return
-
-    await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
+        else:
+            await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
+    else:
+        await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
 
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -127,49 +123,20 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chosen_name = query.data.replace("choose_", "")
     await query.answer()
 
-    user_data = get_user(user_id)
-
-    if user_data:
-        _, assigned_name, attempts = user_data
-        if attempts >= 2:
-            await query.edit_message_text("❌ You have already tried twice. You cannot change again.")
-            return
-        reset_user(user_id)
-        assigned = assign_name(user_id, chosen_name)
-        if not assigned:
-            await query.edit_message_text("⚠️ Sorry, all names have been assigned or only your own name is left.")
-            return
-        increment_attempt(user_id)
-        retry_keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="retry")]]
-        await query.edit_message_text(
-            f"🎉 Oooh you are *{chosen_name}*? How you doing?\n🎁 You are giving your gift to: *{assigned}*\n🤫 (Shhh... Keep it secret!)",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(retry_keyboard)
-        )
-    else:
-        assigned = assign_name(user_id, chosen_name)
-        if not assigned:
-            await query.edit_message_text("⚠️ Sorry, all names have been assigned or only your own name is left.")
-            return
-        retry_keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="retry")]]
-        await query.edit_message_text(
-            f"🎉 Oooh you are *{chosen_name}*? How you doing?\n🎁 You are giving your gift to: *{assigned}*\n🤫 (Shhh... Keep it secret!)",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(retry_keyboard)
-        )
+    assign_name(user_id, chosen_name)
+    retry_keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="retry")]]
+    await query.edit_message_text(
+        f"🎉 Hello *{chosen_name}*!\n✅ Your choice is saved.\nWait for the admin to finalize assignments.",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(retry_keyboard)
+    )
 
 async def handle_retry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
 
-    user_data = get_user(user_id)
-    if user_data:
-        _, _, attempts = user_data
-        if attempts >= 2:
-            await query.edit_message_text("❌ You already retried once. You cannot retry again.")
-            return
-        await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
+    await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
 
 # Admin-only: View DB and clear
 async def debug_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -181,7 +148,7 @@ async def debug_show(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     msg = "📋 All Assignments:\n\n"
     for user_id, name, assigned, attempts in data:
-        msg += f"👤 {name} → 🎁 {assigned} (tries: {attempts})\n"
+        msg += f"👤 {name} → 🎁 {assigned if assigned else 'Not assigned'} (tries: {attempts})\n"
     await update.message.reply_text(msg)
 
 async def debug_clear(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -204,6 +171,12 @@ async def debug_delete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(f"❌ No assignment found for: {name}")
 
+async def debug_finalize(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.username != ADMIN_USERNAME:
+        return
+    success, message = finalize_assignments()
+    await update.message.reply_text(message)
+
 # Run Bot
 def main():
     token = os.environ.get("BOT_TOKEN")
@@ -216,6 +189,7 @@ def main():
     app.add_handler(CommandHandler("debug_show", debug_show))
     app.add_handler(CommandHandler("debug_clear", debug_clear))
     app.add_handler(CommandHandler("debug_delete", debug_delete))
+    app.add_handler(CommandHandler("debug_finalize", debug_finalize))
     app.add_handler(CallbackQueryHandler(start_process, pattern="start_process"))
     app.add_handler(CallbackQueryHandler(handle_retry, pattern="retry"))
     app.add_handler(CallbackQueryHandler(handle_choice, pattern="^choose_"))
