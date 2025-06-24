@@ -41,9 +41,17 @@ def get_all_users():
     return cursor.fetchall()
 
 def assign_name(user_id, chosen_name):
-    cursor.execute("INSERT OR REPLACE INTO users (user_id, chosen_name) VALUES (?, ?)", (user_id, chosen_name))
+    cursor.execute("SELECT attempts FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if row:
+        attempts = row[0]
+        if attempts >= 2:
+            return False
+        cursor.execute("UPDATE users SET chosen_name = ?, attempts = attempts + 1 WHERE user_id = ?", (chosen_name, user_id))
+    else:
+        cursor.execute("INSERT INTO users (user_id, chosen_name, attempts) VALUES (?, ?, 1)", (user_id, chosen_name))
     conn.commit()
-
+    return True
 
 def finalize_assignments():
     users = get_all_users()
@@ -123,7 +131,11 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chosen_name = query.data.replace("choose_", "")
     await query.answer()
 
-    assign_name(user_id, chosen_name)
+    success = assign_name(user_id, chosen_name)
+    if not success:
+        await query.edit_message_text("❌ You've already used your retry. You can't select again.")
+        return
+
     retry_keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="retry")]]
     await query.edit_message_text(
         f"🎉 Hello *{chosen_name}*!\n✅ Your choice is saved.\nWait for the admin to finalize assignments.",
@@ -135,6 +147,11 @@ async def handle_retry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     await query.answer()
+
+    user_data = get_user(user_id)
+    if user_data and user_data[2]:
+        await query.edit_message_text("❌ You've already received your assignment. You can't retry.")
+        return
 
     await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
 
