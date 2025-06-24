@@ -117,7 +117,7 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_data:
         if user_data[1] and user_data[2]:
             await query.edit_message_text(
-                f"🎉 Hello *{user_data[0]}*\n🎁 You are giving your gift to: *{user_data[2]}*\n🤫 (Shhh... keep it secret!)",
+                f"🎉 Hello *{user_data[0]}*\n🎁 You are giving your gift to: *{user_data[1]}*\n🤫 (Shhh... keep it secret!)",
                 parse_mode="Markdown"
             )
             return
