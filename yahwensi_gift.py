@@ -114,16 +114,14 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_data = get_user(user_id)
-    if user_data and user_data[1]:
-        if user_data[2]:
+    if user_data:
+        if user_data[1] and user_data[2]:
             await query.edit_message_text(
-                f"🎁 You are giving your gift to: *{user_data[2]}*\n🤫 (Shhh... keep it secret!)",
+                f"🎉 Hello *{user_data[0]}*\n🎁 You are giving your gift to: *{user_data[2]}*\n🤫 (Shhh... keep it secret!)",
                 parse_mode="Markdown"
             )
-        else:
-            await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
-    else:
-        await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
+            return
+    await query.edit_message_text("Click your name from the list:", reply_markup=get_name_buttons())
 
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -137,11 +135,19 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     retry_keyboard = [[InlineKeyboardButton("😅 Sorry, I clicked the wrong name (retry)", callback_data="retry")]]
-    await query.edit_message_text(
-        f"🎉 Hello *{chosen_name}*!\n✅ Your choice is saved.\nWait for the admin to finalize assignments.",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(retry_keyboard)
-    )
+    user_data = get_user(user_id)
+    if user_data and user_data[2]:
+        await query.edit_message_text(
+            f"🎉 Hello *{chosen_name}*!\n🎁 You are giving your gift to: *{user_data[2]}*\n🤫 (Shhh... keep it secret!)",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(retry_keyboard)
+        )
+    else:
+        await query.edit_message_text(
+            f"🎉 Hello *{chosen_name}*!\n✅ Your choice is saved.\nWait for the admin to finalize assignments.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(retry_keyboard)
+        )
 
 async def handle_retry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
