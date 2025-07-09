@@ -76,7 +76,7 @@ def get_name_buttons():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Start", callback_data="start_process")]]
     await update.message.reply_text(
-        "Welcome ያህወንሲ!\n\n"
+        "Welcome ያህዌንሲ!\n\n"
         "This bot helps you secretly assign someone to give a gift to.\n\n"
         "👉 How it works:\n"
         "- Click 'Start' to begin.\n"
