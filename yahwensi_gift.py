@@ -123,7 +123,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     assigned_name = assignments[chosen_name]
     await query.edit_message_text(
-        f"🎁 You are assigned to: *{assigned_name}*\n🤫 Keep it secret!",
+        f"🎁 You are assigned to: *{assigned_name}*\n🤫 Keep it secret! \n በሰላም ያገናኘን!!!\n\n",
         parse_mode="Markdown"
     )
 
