@@ -76,7 +76,14 @@ def get_name_buttons():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Start", callback_data="start_process")]]
     await update.message.reply_text(
-        "🎄 Welcome to Secret Santa!\n\nClick 'Start' to pick your name and receive your assignment.",
+        "Welcome ያህወንሲ!\n\n"
+        "This bot helps you secretly assign someone to give a gift to.\n\n"
+        "👉 How it works:\n"
+        "- Click 'Start' to begin.\n"
+        "- Choose your name from the list.\n"
+        "- You'll be assigned a name (keep it secret 🤫).\n"
+        "- You can only click your *own* name!\n\n"
+        "⚠️ If you click another person's name, it won't work.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -100,8 +107,12 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         correct_name = "mntie"
 
     if correct_name != chosen_name:
-        await query.edit_message_text("🚫 You can only select your own name!")
-        return
+      await query.edit_message_text(
+        f"🚫 No, you are not {chosen_name}! Click your name below 👇:",
+        reply_markup=get_name_buttons()
+    )
+    return
+
 
     # Log view
     cursor.execute(
