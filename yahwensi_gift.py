@@ -111,7 +111,7 @@ async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🚫 No, you are not {chosen_name}! Click your name below 👇:",
         reply_markup=get_name_buttons()
     )
-    return
+      return
 
 
     # Log view
