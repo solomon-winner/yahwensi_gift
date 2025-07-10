@@ -25,6 +25,7 @@ assignments = {
 # Usernames Mapping (username → name)
 usernames = {
     "Sol_african": "solomon",
+    "Mentie3a": "mntie",
     "Myfam1a4": "selam",
     "yidodi": "yididya",
     "bukne1": "eden",
@@ -40,8 +41,6 @@ usernames = {
     "ElshadayGech": "elshu"
 }
 
-# Special User with no username (mntie)
-SPECIAL_USER_ID = 123456789  # Replace with actual user ID of "mntie"
 
 ADMIN_USERNAME = "Sol_african"
 
@@ -95,16 +94,11 @@ async def start_process(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     username = query.from_user.username
-    user_id = query.from_user.id
     first_name = query.from_user.first_name
     chosen_name = query.data.replace("choose_", "")
     await query.answer()
 
     correct_name = usernames.get(username)
-
-    # Handle mntie by user ID
-    if user_id == SPECIAL_USER_ID:
-        correct_name = "mntie"
 
     if correct_name != chosen_name:
       await query.edit_message_text(
